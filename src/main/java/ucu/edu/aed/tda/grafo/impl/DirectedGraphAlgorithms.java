@@ -10,9 +10,13 @@ import ucu.edu.aed.tda.grafo.model.result.IFloydWarshallResult;
 import ucu.edu.aed.tda.grafo.model.result.Path;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -54,12 +58,105 @@ public class DirectedGraphAlgorithms implements IDirectedGraphAlgorithms {
 
     @Override
     public <V, D extends WeightedEdge> IDijkstraResult<V> dijkstra(Comparable<V> source, IDirectedIGraph<V, D> grafo) {
-        throw new UnsupportedOperationException("Pendiente");
+        V origen = grafo.buscarVertice(source);
+        if (origen == null) {
+            throw new IllegalArgumentException("El vertice de origen no pertenece al grafo");
+        }
+        for (Edge<V, D> arista : grafo.aristas()) {
+            if (arista.dato() == null || !Double.isFinite(arista.dato().getWeight())
+                    || arista.dato().getWeight() < 0) {
+                throw new IllegalArgumentException("Dijkstra requiere pesos finitos y no negativos");
+            }
+        }
+        Map<V, Double> costos = new LinkedHashMap<>();
+        Map<V, V> predecesores = new LinkedHashMap<>();
+        Set<V> visitados = new HashSet<>();
+        for (V vertice : grafo.vertices()) {
+            costos.put(vertice, Double.POSITIVE_INFINITY);
+        }
+        costos.put(origen, 0.0);
+        while (visitados.size() < costos.size()) {
+            V actual = null;
+            double minimo = Double.POSITIVE_INFINITY;
+            for (Map.Entry<V, Double> entrada : costos.entrySet()) {
+                if (!visitados.contains(entrada.getKey()) && entrada.getValue() < minimo) {
+                    actual = entrada.getKey();
+                    minimo = entrada.getValue();
+                }
+            }
+            if (actual == null) {
+                break;
+            }
+            visitados.add(actual);
+            for (Edge<V, D> arista : grafo.adyacencias(grafo.construirComparable(actual))) {
+                if (visitados.contains(arista.target())) {
+                    continue;
+                }
+                double nuevoCosto = minimo + arista.dato().getWeight();
+                if (!Double.isFinite(nuevoCosto)) {
+                    throw new ArithmeticException("El costo de un camino excede el rango de double");
+                }
+                if (nuevoCosto < costos.get(arista.target())) {
+                    costos.put(arista.target(), nuevoCosto);
+                    predecesores.put(arista.target(), actual);
+                }
+            }
+        }
+        return new DijkstraResult<>(origen, costos, predecesores);
     }
 
     @Override
     public <V, D extends WeightedEdge> IFloydWarshallResult<V> floyd(IDirectedIGraph<V, D> grafo) {
-        throw new UnsupportedOperationException("Pendiente");
+        List<V> vertices = new ArrayList<>(grafo.vertices());
+        Map<V, Integer> indices = new HashMap<>();
+        int cantidad = vertices.size();
+        double[][] costos = new double[cantidad][cantidad];
+        int[][] siguientes = new int[cantidad][cantidad];
+        for (int i = 0; i < cantidad; i++) {
+            indices.put(vertices.get(i), i);
+            Arrays.fill(costos[i], Double.POSITIVE_INFINITY);
+            Arrays.fill(siguientes[i], -1);
+            costos[i][i] = 0;
+            siguientes[i][i] = i;
+        }
+        for (Edge<V, D> arista : grafo.aristas()) {
+            if (arista.dato() == null || !Double.isFinite(arista.dato().getWeight())) {
+                throw new IllegalArgumentException("Floyd requiere pesos finitos en todas las aristas");
+            }
+            int origen = indices.get(arista.source());
+            int destino = indices.get(arista.target());
+            double peso = arista.dato().getWeight();
+            if (peso < costos[origen][destino]) {
+                costos[origen][destino] = peso;
+                siguientes[origen][destino] = destino;
+            }
+        }
+        for (int k = 0; k < cantidad; k++) {
+            for (int i = 0; i < cantidad; i++) {
+                if (costos[i][k] == Double.POSITIVE_INFINITY) {
+                    continue;
+                }
+                for (int j = 0; j < cantidad; j++) {
+                    if (costos[k][j] == Double.POSITIVE_INFINITY) {
+                        continue;
+                    }
+                    double nuevoCosto = costos[i][k] + costos[k][j];
+                    if (!Double.isFinite(nuevoCosto)) {
+                        throw new ArithmeticException("El costo de un camino excede el rango de double");
+                    }
+                    if (nuevoCosto < costos[i][j]) {
+                        costos[i][j] = nuevoCosto;
+                        siguientes[i][j] = siguientes[i][k];
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < cantidad; i++) {
+            if (costos[i][i] < 0) {
+                throw new IllegalArgumentException("El grafo tiene un ciclo de costo negativo");
+            }
+        }
+        return new FloydWarshallResult<>(vertices, costos, siguientes);
     }
 
     @Override
@@ -69,12 +166,35 @@ public class DirectedGraphAlgorithms implements IDirectedGraphAlgorithms {
 
     @Override
     public <V, D extends WeightedEdge> V obtenerCentroGrafo(IDirectedIGraph<V, D> grafo) {
-        throw new UnsupportedOperationException("Pendiente");
+        IFloydWarshallResult<V> resultado = floyd(grafo);
+        V centro = null;
+        double menorExcentricidad = Double.POSITIVE_INFINITY;
+        for (V vertice : grafo.vertices()) {
+            double excentricidad = excentricidadDeEntrada(grafo, resultado, vertice);
+            if (excentricidad < menorExcentricidad) {
+                centro = vertice;
+                menorExcentricidad = excentricidad;
+            }
+        }
+        return centro;
     }
 
     @Override
     public <V, D extends WeightedEdge> double obtenerExcentricidad(IDirectedIGraph<V, D> grafo, Comparable<V> vertexCriteria) {
-        throw new UnsupportedOperationException("Pendiente");
+        V vertice = grafo.buscarVertice(vertexCriteria);
+        if (vertice == null) {
+            throw new IllegalArgumentException("El vertice no pertenece al grafo");
+        }
+        return excentricidadDeEntrada(grafo, floyd(grafo), vertice);
+    }
+
+    private <V, D extends WeightedEdge> double excentricidadDeEntrada(
+            IDirectedIGraph<V, D> grafo, IFloydWarshallResult<V> resultado, V destino) {
+        double maximo = 0;
+        for (V origen : grafo.vertices()) {
+            maximo = Math.max(maximo, resultado.getCost(origen, destino));
+        }
+        return maximo;
     }
 
     @Override

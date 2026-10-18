@@ -28,12 +28,17 @@ public interface IDirectedGraphAlgorithms {
     <V, D extends WeightedEdge> IFloydWarshallResult<V> warshall(IDirectedIGraph<V, D> grafo);
 
     /**
-     * Calcula el centro del grafo
+     * Calcula el centro por excentricidad de entrada: minimiza el mayor costo
+     * minimo desde todos los vertices hasta el centro. En empates devuelve el
+     * primero en el orden de vertices. Retorna null si el grafo esta vacio o
+     * ningun vertice es alcanzable desde todos los demas.
      */
     <V, D extends WeightedEdge> V obtenerCentroGrafo(IDirectedIGraph<V, D> grafo);
 
     /**
-     * Calcula la excentrecidad de un vértice
+     * Calcula la excentricidad de entrada: maximo costo minimo desde cualquier
+     * origen hasta el vertice. Es infinito si algun origen no puede alcanzarlo.
+     * Lanza IllegalArgumentException si el vertice no existe.
      */
     <V, D extends WeightedEdge> double obtenerExcentricidad(IDirectedIGraph<V, D> grafo, Comparable<V> vertexCriteria);
 
