@@ -27,7 +27,7 @@ public interface IUndirectedGraphAlgorithm {
             return prim(graph, graph.construirComparable(vertex));
         }
 
-        return null;
+        return kruskal(graph);
     }
 
 
@@ -41,4 +41,6 @@ public interface IUndirectedGraphAlgorithm {
      * Implementa el algoritmo de búsqueda en amplitud
      */
     <V, D> void bea(IUndirectedGraph<V, D> graph, Consumer<V> consumer);
+
+    <V, D> void bea(IUndirectedGraph<V, D> graph, Comparable<V> source, Consumer<V> consumer);
 }
